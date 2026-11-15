@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F.R.I.D.A.Y. AI Connection</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: #080d18;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 430px;
+            padding: 30px 24px;
+            text-align: center;
+            background: #111b2d;
+            border: 1px solid #263b59;
+            border-radius: 22px;
+            box-shadow: 0 15px 50px #0008;
+        }
+
+        .logo {
+            font-size: 38px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            color: #38bdf8;
+        }
+
+        .subtitle {
+            margin-top: 10px;
+            color: #9fb2ca;
+            font-size: 14px;
+        }
+
+        .status {
+            margin: 25px 0;
+            padding: 14px;
+            border-radius: 12px;
+            background: #0b1423;
+            color: #fbbf24;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 12px;
+            border: none;
+            border-radius: 12px;
+            background: #0284c7;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+        }
+
+        .secondary {
+            background: #26364d;
+        }
+
+        .note {
+            margin-top: 22px;
+            color: #8194ad;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="logo">F.R.I.D.A.Y.</div>
+
+    <div class="subtitle">
+        Secure Puter AI Connection
+    </div>
+
+    <div class="status" id="status">
+        Checking connection...
+    </div>
+
+    <button id="signInButton" onclick="fridaySignIn()">
+        Sign in with Puter
+    </button>
+
+    <button class="secondary"
+            id="signOutButton"
+            onclick="fridaySignOut()">
+        Sign out
+    </button>
+
+    <div class="note">
+        Your Puter account authenticates AI access.
+        Never share your password or authentication tokens.
+    </div>
+
+</div>
+
+<script src="https://js.puter.com/v2/"></script>
+
+<script>
+
+    const statusElement = document.getElementById("status");
+    const signInButton = document.getElementById("signInButton");
+
+    function updateStatus(message, color) {
+        statusElement.textContent = message;
+        statusElement.style.color = color;
+    }
+
+    function notifyAndroid(signedIn) {
+        if (
+            window.FridayBridge &&
+            typeof window.FridayBridge.onAuthStatus === "function"
+        ) {
+            window.FridayBridge.onAuthStatus(signedIn);
+        }
+    }
+
+    function fridayCheckAuth() {
+
+        try {
+
+            if (typeof puter === "undefined") {
+                updateStatus("Loading Puter AI...", "#fbbf24");
+                return;
+            }
+
+            const signedIn = puter.auth.isSignedIn();
+
+            if (signedIn) {
+                updateStatus("Connected successfully!", "#4ade80");
+            } else {
+                updateStatus("Puter account is not connected.", "#fbbf24");
+            }
+
+            notifyAndroid(signedIn);
+
+        } catch (error) {
+
+            updateStatus("Authentication check failed.", "#f87171");
+
+            if (window.FridayBridge) {
+                window.FridayBridge.onAuthError(
+                    String(error.message || error)
+                );
+            }
+        }
+    }
+
+    async function fridaySignIn() {
+
+        try {
+
+            signInButton.disabled = true;
+
+            updateStatus("Opening Puter sign-in...", "#38bdf8");
+
+            await puter.auth.signIn();
+
+            updateStatus("Connected successfully!", "#4ade80");
+
+            notifyAndroid(true);
+
+        } catch (error) {
+
+            updateStatus(
+                "Sign-in failed: " + (error.message || error),
+                "#f87171"
+            );
+
+            notifyAndroid(false);
+
+            if (window.FridayBridge) {
+                window.FridayBridge.onAuthError(
+                    String(error.message || error)
+                );
+            }
+
+        } finally {
+
+            signInButton.disabled = false;
+        }
+    }
+
+    async function fridaySignOut() {
+
+        try {
+
+            await puter.auth.signOut();
+
+            updateStatus("Signed out successfully.", "#fbbf24");
+
+            notifyAndroid(false);
+
+        } catch (error) {
+
+            updateStatus("Sign-out failed.", "#f87171");
+        }
+    }
+
+    async function fridayGenerate(prompt) {
+
+        try {
+
+            if (typeof puter === "undefined") {
+                throw new Error("Puter AI is not loaded.");
+            }
+
+            if (!puter.auth.isSignedIn()) {
+                throw new Error("Puter account is not connected.");
+            }
+
+            if (!prompt || !prompt.trim()) {
+                throw new Error("Message cannot be empty.");
+            }
+
+            const messages = [
+                {
+                    role: "system",
+                    content:
+                        "You are F.R.I.D.A.Y., a helpful AI assistant. " +
+                        "Understand Tamil, Tanglish and English. " +
+                        "Reply naturally in the language and style used by the user. " +
+                        "Give clear, useful and accurate answers. " +
+                        "Do not pretend to access phone features unless permission " +
+                        "and an actual Android integration are available."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ];
+
+            const result = await puter.ai.chat(messages, {
+                model: "gpt-5.4-nano"
+            });
+
+            let answer = "";
+
+            if (
+                result &&
+                result.message &&
+                typeof result.message.content === "string"
+            ) {
+                answer = result.message.content;
+            } else if (typeof result === "string") {
+                answer = result;
+            } else {
+                answer = JSON.stringify(result);
+            }
+
+            if (!answer.trim()) {
+                throw new Error("AI returned an empty response.");
+            }
+
+            if (window.FridayBridge) {
+                window.FridayBridge.onAiResponse(answer);
+            }
+
+            return answer;
+
+        } catch (error) {
+
+            const message = String(error.message || error);
+
+            if (window.FridayBridge) {
+                window.FridayBridge.onAiError(message);
+            }
+
+            throw error;
+        }
+    }
+
+    window.addEventListener("load", function() {
+
+        setTimeout(function() {
+            fridayCheckAuth();
+        }, 1000);
+
+    });
+
+</script>
+
+</body>
+</html>
